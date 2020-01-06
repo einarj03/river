@@ -117,3 +117,138 @@ const char *status_description(int code) {
 
 /* insert your functions here */
 
+char** make_river_scene(const char left[7], const char boat[2]) {
+  char **scene = create_scene();
+  add_to_scene(scene, 0, 0, "bank.txt");
+  add_to_scene(scene, 0, 53, "bank.txt");
+  add_to_scene(scene, 3, 30, "sun.txt");
+  add_to_scene(scene,19, 19, "river.txt");
+
+  bool boat_right = true;
+  int mis_count = 0;
+  int can_count = 0;
+  int boat_mis_count = 0;
+  int boat_can_count = 0;
+
+  count_people(left, boat, mis_count, can_count, boat_mis_count, boat_can_count, boat_right);
+
+  int boat_count = 0;
+  for (int i = 0; i < boat_mis_count; ++i) {
+    add_to_scene(scene, 11, 22 + boat_right * 17 + 6 * boat_count, "missionary.txt");
+    ++boat_count;
+  }
+  
+  for (int i = 0; i < boat_can_count; ++i) {
+    add_to_scene(scene, 11, 22 + boat_right * 17 + 6 * boat_count, "cannibal.txt");
+    ++boat_count;
+  }
+
+  add_to_scene(scene, 17, 19 + boat_right * 17, "boat.txt");
+
+  for (int i = 0; i < mis_count; ++i)
+    add_to_scene(scene, 2, 1 + 6*i, "missionary.txt");
+
+  for (int i = 0; i < can_count; ++i)
+    add_to_scene(scene, 11, 1 + 6*i, "cannibal.txt");
+
+  for (int i = 0; i < 3 - mis_count - boat_mis_count; ++i)
+    add_to_scene(scene, 2, 54 + 6*i, "missionary.txt");
+
+  for (int i = 0; i < 3 - can_count - boat_can_count; ++i)
+    add_to_scene(scene, 11, 54 + 6*i, "cannibal.txt");
+
+  return scene;
+}
+
+Status perform_crossing(char left[7], const char targets[2]) {
+  bool boat_right = true;
+  int mis_count = 0;
+  int can_count = 0;
+  int target_mis_count = 0;
+  int target_can_count = 0;
+
+  for (int i = 0; i < strlen(targets); ++i) {
+    if (targets[i] != 'B' && targets[i] != 'M' && targets[i] != 'C')
+      return ERROR_INPUT_STREAM_ERROR;
+  }
+
+  count_people(left, targets, mis_count, can_count, target_mis_count, target_can_count, boat_right);
+
+  int left_mis;
+  int left_can;
+  int right_mis;
+  int right_can;
+
+  if (boat_right) {
+    left_mis = mis_count + target_mis_count;
+    left_can = can_count + target_can_count;
+    right_mis = 3 - left_mis;
+    right_can = 3 - left_can;  
+  } else {
+    left_mis = mis_count - target_mis_count;
+    left_can = can_count - target_can_count;
+    right_mis = 3 - left_mis;
+    right_can = 3 - left_can;
+  }
+
+  if (left_mis < 0 || left_can < 0 || right_mis < 0 || right_can < 0 || target_can_count + target_mis_count == 0)
+    return ERROR_INVALID_MOVE;
+
+  strcpy(left, boat_right ? "B" : "");
+  for (int i = 0; i < left_mis; ++i)
+    strcat(left, "M");
+
+  for (int i = 0; i < left_can; ++i)
+    strcat(left, "C");
+
+  if ((left_can > left_mis && left_mis != 0) || (right_can > right_mis && right_mis != 0))
+    return ERROR_MISSIONARIES_EATEN;
+
+  if (right_mis == 3 && right_can == 3)
+    return VALID_GOAL_STATE;
+
+  return VALID_NONGOAL_STATE;
+}
+
+void count_people(const char left[7], const char boat[2], int &mis_count, int &can_count, int &boat_mis_count, int &boat_can_count, bool &boat_right) {
+  for (int i = 0; i < strlen(left); ++i) {
+    switch (left[i]) {
+      case 'B': boat_right = false; break;
+      case 'M': ++mis_count; break;
+      case 'C': ++can_count; break;
+    }
+  }
+
+  for (int i = 0; i < strlen(boat); ++i) {
+    switch (boat[i]) {
+      case 'M': ++boat_mis_count; break;
+      case 'C': ++boat_can_count; break;
+    }
+  }
+}
+
+Status play_game() {
+  char left[] = "BCCCMMM";
+  char **scene = make_river_scene(left,"");
+  print_scene(scene);
+  Status game_state = VALID_NONGOAL_STATE;
+
+  cout << "\nType who you would like to send across the river." << endl;
+  cout << "M for missionary, C for cannibal, and q to quit." << endl;
+
+  char input[2];
+
+  while (strcmp(input, "q") != 0 && game_state != VALID_GOAL_STATE && game_state != ERROR_MISSIONARIES_EATEN) {
+    cout << "Next move: " << endl;
+    cin >> input;
+    filter(input);
+
+    game_state = perform_crossing(left, input);
+    scene = make_river_scene(left, "");
+    print_scene(scene);
+    cout << "After crossing left = " << left << endl;
+    cout << status_description(game_state) << endl << endl;
+  }
+
+  return game_state;
+}
